@@ -6,7 +6,7 @@ efforts.
 
 For more information about the source data, see:
 
-https://ftp.ncbi.nlm.nih.gov/pub/lu/PubTatorCentral/README.txt
+https://ftp.ncbi.nlm.nih.gov/pub/lu/PubTator3/README.txt
 """
 import os
 
@@ -25,11 +25,13 @@ rule all:
         os.path.join(config["output_dir"], "json", "human_entrez_pmids.json"),
         os.path.join(config["output_dir"], "json", "disease_pmids.json"),
         os.path.join(config["output_dir"], "json", "chemical_pmids.json"),
+        os.path.join(config["output_dir"], "json", "mutation_pmids.json"),
         os.path.join(config["output_dir"], "co-occurrence", "human_gene_gene_comat.feather"),
         os.path.join(config["output_dir"], "co-occurrence", "human_disease_disease_comat.feather"),
         os.path.join(config["output_dir"], "co-occurrence", "human_chemical_chemical_comat.feather"),
         os.path.join(config["output_dir"], "co-occurrence", "human_gene_chemical_comat.feather"),
-        os.path.join(config["output_dir"], "co-occurrence", "human_gene_disease_comat.feather")
+        os.path.join(config["output_dir"], "co-occurrence", "human_gene_disease_comat.feather"),
+        os.path.join(config["output_dir"], "co-occurrence", "human_mutation_disease_comat.feather")
 
 rule create_gene_gene_comat:
     input:
@@ -64,6 +66,15 @@ rule create_gene_chemical_comat:
     script:
         "scripts/create_gene_chemical_comat.py"
 
+rule create_mutation_disease_comat:
+    input:
+        os.path.join(config["output_dir"], "json", "mutation_pmids.json"),
+        os.path.join(config["output_dir"], "json", "disease_pmids.json")
+    output:
+        os.path.join(config["output_dir"], "co-occurrence", "human_mutation_disease_comat.feather")
+    script:
+        "scripts/create_mutation_disease_comat.py"
+
 rule create_gene_disease_comat:
     input:
         os.path.join(config["output_dir"], "json", "human_entrez_pmids.json"),
@@ -88,6 +99,14 @@ rule create_disease_pmid_mapping:
         os.path.join(config["output_dir"], "json", "disease_pmids.json")
     script:
         "scripts/create_disease_pmid_mapping.py"
+
+rule create_mutation_pmid_mapping:
+    input:
+        os.path.join(config["output_dir"], "filtered", "mutation.feather")
+    output:
+        os.path.join(config["output_dir"], "json", "mutation_pmids.json")
+    script:
+        "scripts/create_mutation_pmid_mapping.py"
 
 rule create_human_gene_pmid_mapping:
     input:
@@ -150,3 +169,5 @@ rule download_data:
         """
         curl --output {output} https://ftp.ncbi.nlm.nih.gov/pub/lu/PubTator3/{wildcards.annot}2pubtator3.gz
         """
+
+# vi:ft=snakemake

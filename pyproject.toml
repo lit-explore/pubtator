@@ -1,0 +1,12 @@
+[project]
+name = "pubtator-pipeline"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "biothings-client>=0.4.1",
+    "pandas>=3.0.0",
+    "pyarrow>=23.0.0",
+    "snakemake>=9.16.2",
+]
