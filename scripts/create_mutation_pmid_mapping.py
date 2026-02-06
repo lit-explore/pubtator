@@ -2,10 +2,8 @@
 Create a mapping from mutations to pubmed article ids
 """
 
-import json
-
 import pandas as pd
-from utils import numpy_encoder
+from sparse_utils import save_pmid_mapping
 
 snek = snakemake
 
@@ -21,6 +19,5 @@ mutation_pmids = (
 
 print(f"Mapped {len(mutation_pmids)} mutations to PMIDs")
 
-# store mutation -> pmid mapping as json
-with open(snek.output[0], "wt", encoding="utf-8") as fp:
-    json.dump(mutation_pmids, fp, default=numpy_encoder)
+# store mutation -> pmid mapping as gzip-compressed json
+save_pmid_mapping(mutation_pmids, snek.output[0])

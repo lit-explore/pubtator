@@ -1,43 +1,52 @@
 """
-Creates a gene-gene co-occurrence matrix
+Creates a gene-gene co-occurrence matrix using sparse matrix multiplication.
+
+Outputs:
+    - gene_gene_counts.npz: Raw co-occurrence counts (upper triangle)
+    - gene_gene_dice.npz: Dice coefficient scores (upper triangle)
+    - gene_gene_npmi.npz: NPMI scores (upper triangle)
+    - gene_gene_labels.json: Entity labels (shared across all matrices)
 """
 
-import json
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from sparse_utils import (
+    build_incidence_matrix,
+    compute_cooccurrence,
+    compute_scores,
+    load_pmid_mapping,
+    save_cooccurrence_matrices,
+)
 
 snek = snakemake
 
 # load gene/pmid mapping
-with open(snek.input[0]) as fp:
-    gene_pmids = json.load(fp)
+gene_pmids = load_pmid_mapping(snek.input[0])
 
-# pre-convert to sets for faster intersection operations
-gene_pmid_sets = {k: set(v) for k, v in gene_pmids.items()}
+print(f"Building incidence matrix for {len(gene_pmids)} genes...")
 
-# create empty matrix to store gene-gene co-occurrence counts
-entrez_ids = list(gene_pmid_sets.keys())
-num_genes = len(entrez_ids)
+# build sparse incidence matrix (PMIDs x genes)
+incidence, entities, all_pmids = build_incidence_matrix(gene_pmids)
 
-comat = np.zeros((num_genes, num_genes), dtype=np.uint32)
+print(f"Computing co-occurrence matrix via sparse multiplication...")
 
-print(f"Computing {num_genes} x {num_genes} co-occurrence matrix...")
+# compute co-occurrence via matrix multiplication
+comat = compute_cooccurrence(incidence)
 
-# indices of upper triangular matrix
-indices = np.triu_indices(num_genes, k=1)
+print(f"Computing normalized scores (Dice, NPMI)...")
 
-# iterate over pairs of genes and compute overlap
-for ind in range(len(indices[0])):
-    i = indices[0][ind]
-    j = indices[1][ind]
+# compute normalized scores
+scores = compute_scores(comat, total_docs=len(all_pmids))
 
-    gene1_pmids = gene_pmid_sets[entrez_ids[i]]
-    gene2_pmids = gene_pmid_sets[entrez_ids[j]]
+# save all matrices (upper triangle only for symmetric)
+output_dir = Path(snek.output[0]).parent
+prefix = getattr(snek.params, "prefix", "gene_gene")
+save_cooccurrence_matrices(
+    scores=scores,
+    labels=entities,
+    output_dir=output_dir,
+    prefix=prefix,
+    symmetric=True,
+)
 
-    num_shared = len(gene1_pmids & gene2_pmids)
-    comat[i, j] = comat[j, i] = num_shared
-
-# store gene-gene co-occurrence matrix
-comat = pd.DataFrame(comat, index=entrez_ids, columns=entrez_ids)
-comat.reset_index().rename(columns={"index": "entrez_id"}).to_feather(snek.output[0])
+print(f"Saved {prefix} co-occurrence matrices to {output_dir}")

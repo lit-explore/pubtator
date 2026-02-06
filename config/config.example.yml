@@ -5,6 +5,31 @@
 # where to store raw & processed data
 output_dir: "/data/pubtator/2026-01-16"
 
+# Species configuration
+# Each species requires:
+#   - id: NCBI taxonomy ID (e.g., "9606" for human)
+#   - name: Short name used in output file naming
+#   - gene_symbols_file: Path to file with gene symbols (one per line)
+#   - gene_ensembl_file: Path to file with Ensembl gene IDs (one per line)
+#
+# Common species IDs:
+#   9606  = Homo sapiens (human)
+#   10090 = Mus musculus (mouse)
+#   10116 = Rattus norvegicus (rat)
+#   7955  = Danio rerio (zebrafish)
+#   7227  = Drosophila melanogaster (fruit fly)
+#   6239  = Caenorhabditis elegans (nematode)
+species:
+  - id: "9606"
+    name: "human"
+    gene_symbols_file: "data/symbols.txt"
+    gene_ensembl_file: "data/ensgenes.txt"
+  # Uncomment to add additional species:
+  # - id: "10090"
+  #   name: "mouse"
+  #   gene_symbols_file: "data/mouse_symbols.txt"
+  #   gene_ensembl_file: "data/mouse_ensgenes.txt"
+
 filtering:
   # maximum number of entries allow for a single article; in some cases, a single article may be
   # assoicated with >100k annotations in PubTator, indicating a likely issue with the upstream data

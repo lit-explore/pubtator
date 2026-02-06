@@ -1,52 +1,65 @@
 """
-Creates a chemical-chemical co-occurrence matrix
+Creates a chemical-chemical co-occurrence matrix using sparse matrix multiplication.
+
+Outputs:
+    - chemical_chemical_counts.npz: Raw co-occurrence counts (upper triangle)
+    - chemical_chemical_dice.npz: Dice coefficient scores (upper triangle)
+    - chemical_chemical_npmi.npz: NPMI scores (upper triangle)
+    - chemical_chemical_labels.json: Entity labels (shared across all matrices)
 """
 
-import json
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from sparse_utils import (
+    build_incidence_matrix,
+    compute_cooccurrence,
+    compute_scores,
+    load_pmid_mapping,
+    save_cooccurrence_matrices,
+)
 
 snek = snakemake
 
 # load chemical/pmid mapping
-with open(snek.input[0]) as fp:
-    unfiltered_chemical_pmids = json.load(fp)
+unfiltered_chemical_pmids = load_pmid_mapping(snek.input[0])
 
-# filter any chemicals with less than N citations; helps keep the co-occurrence
-# matrix size more manageable while only losing relatively low-information
-# low-citation counts..
+# filter chemicals with less than N citations to keep matrix size manageable
 concept_id_min_freq = snek.config["filtering"]["chem_comat_concept_id_min_freq"]
 
-# pre-convert to sets and filter in one pass
-chemical_pmid_sets = {
-    mesh_id: set(pmids)
+chemical_pmids = {
+    mesh_id: pmids
     for mesh_id, pmids in unfiltered_chemical_pmids.items()
     if len(pmids) > concept_id_min_freq
 }
 
-# create empty matrix to store chemical-chemical co-occurrence counts
-mesh_ids = list(chemical_pmid_sets.keys())
-num_chemicals = len(mesh_ids)
+print(
+    f"Filtered to {len(chemical_pmids)}/{len(unfiltered_chemical_pmids)} chemicals "
+    f"with > {concept_id_min_freq} citations"
+)
 
-comat = np.zeros((num_chemicals, num_chemicals), dtype=np.uint32)
+print(f"Building incidence matrix for {len(chemical_pmids)} chemicals...")
 
-print(f"Computing {num_chemicals} x {num_chemicals} co-occurrence matrix...")
+# build sparse incidence matrix (PMIDs x chemicals)
+incidence, entities, all_pmids = build_incidence_matrix(chemical_pmids)
 
-# get upper triangular matrix indices
-ind = np.triu_indices(num_chemicals, k=1)
+print(f"Computing co-occurrence matrix via sparse multiplication...")
 
-# iterate over pairs of chemicals
-for cur_ind in range(len(ind[0])):
-    i = ind[0][cur_ind]
-    j = ind[1][cur_ind]
+# compute co-occurrence via matrix multiplication
+comat = compute_cooccurrence(incidence)
 
-    chemical1_pmids = chemical_pmid_sets[mesh_ids[i]]
-    chemical2_pmids = chemical_pmid_sets[mesh_ids[j]]
+print(f"Computing normalized scores (Dice, NPMI)...")
 
-    num_shared = len(chemical1_pmids & chemical2_pmids)
-    comat[i, j] = comat[j, i] = num_shared
+# compute normalized scores
+scores = compute_scores(comat, total_docs=len(all_pmids))
 
-# store chemical-chemical co-occurrence matrix
-comat = pd.DataFrame(comat, index=mesh_ids, columns=mesh_ids)
-comat.reset_index().rename(columns={"index": "mesh_id"}).to_feather(snek.output[0])
+# save all matrices (upper triangle only for symmetric)
+output_dir = Path(snek.output[0]).parent
+save_cooccurrence_matrices(
+    scores=scores,
+    labels=entities,
+    output_dir=output_dir,
+    prefix="chemical_chemical",
+    symmetric=True,
+)
+
+print(f"Saved chemical-chemical co-occurrence matrices to {output_dir}")

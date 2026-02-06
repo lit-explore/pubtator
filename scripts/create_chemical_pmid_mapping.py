@@ -2,10 +2,8 @@
 Create a mapping from chemical mesh ids to pubmed article ids
 """
 
-import json
-
 import pandas as pd
-from utils import numpy_encoder
+from sparse_utils import save_pmid_mapping
 
 snek = snakemake
 
@@ -21,6 +19,5 @@ chemical_pmids = (
 
 print(f"Mapped {len(chemical_pmids)} chemicals to PMIDs")
 
-# store chemical -> pmid mapping as json
-with open(snek.output[0], "wt", encoding="utf-8") as fp:
-    json.dump(chemical_pmids, fp, default=numpy_encoder)
+# store chemical -> pmid mapping as gzip-compressed json
+save_pmid_mapping(chemical_pmids, snek.output[0])

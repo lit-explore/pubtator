@@ -2,10 +2,8 @@
 Create a mapping from disease mesh ids to pubmed article ids
 """
 
-import json
-
 import pandas as pd
-from utils import numpy_encoder
+from sparse_utils import save_pmid_mapping
 
 snek = snakemake
 
@@ -21,6 +19,5 @@ disease_pmids = (
 
 print(f"Mapped {len(disease_pmids)} diseases to PMIDs")
 
-# store disease -> pmid mapping as json
-with open(snek.output[0], "wt", encoding="utf-8") as fp:
-    json.dump(disease_pmids, fp, default=numpy_encoder)
+# store disease -> pmid mapping as gzip-compressed json
+save_pmid_mapping(disease_pmids, snek.output[0])

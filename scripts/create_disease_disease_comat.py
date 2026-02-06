@@ -1,43 +1,51 @@
 """
-Creates a disease-disease co-occurrence matrix
+Creates a disease-disease co-occurrence matrix using sparse matrix multiplication.
+
+Outputs:
+    - disease_disease_counts.npz: Raw co-occurrence counts (upper triangle)
+    - disease_disease_dice.npz: Dice coefficient scores (upper triangle)
+    - disease_disease_npmi.npz: NPMI scores (upper triangle)
+    - disease_disease_labels.json: Entity labels (shared across all matrices)
 """
 
-import json
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from sparse_utils import (
+    build_incidence_matrix,
+    compute_cooccurrence,
+    compute_scores,
+    load_pmid_mapping,
+    save_cooccurrence_matrices,
+)
 
 snek = snakemake
 
 # load disease/pmid mapping
-with open(snek.input[0]) as fp:
-    disease_pmids = json.load(fp)
+disease_pmids = load_pmid_mapping(snek.input[0])
 
-# pre-convert to sets for faster intersection operations
-disease_pmid_sets = {k: set(v) for k, v in disease_pmids.items()}
+print(f"Building incidence matrix for {len(disease_pmids)} diseases...")
 
-# create empty matrix to store disease-disease co-occurrence counts
-mesh_ids = list(disease_pmid_sets.keys())
-num_diseases = len(mesh_ids)
+# build sparse incidence matrix (PMIDs x diseases)
+incidence, entities, all_pmids = build_incidence_matrix(disease_pmids)
 
-comat = np.zeros((num_diseases, num_diseases), dtype=np.uint32)
+print(f"Computing co-occurrence matrix via sparse multiplication...")
 
-print(f"Computing {num_diseases} x {num_diseases} co-occurrence matrix...")
+# compute co-occurrence via matrix multiplication
+comat = compute_cooccurrence(incidence)
 
-# get upper triangular matrix indices
-ind = np.triu_indices(num_diseases, k=1)
+print(f"Computing normalized scores (Dice, NPMI)...")
 
-# iterate over pairs of diseases
-for cur_ind in range(len(ind[0])):
-    i = ind[0][cur_ind]
-    j = ind[1][cur_ind]
+# compute normalized scores
+scores = compute_scores(comat, total_docs=len(all_pmids))
 
-    disease1_pmids = disease_pmid_sets[mesh_ids[i]]
-    disease2_pmids = disease_pmid_sets[mesh_ids[j]]
+# save all matrices (upper triangle only for symmetric)
+output_dir = Path(snek.output[0]).parent
+save_cooccurrence_matrices(
+    scores=scores,
+    labels=entities,
+    output_dir=output_dir,
+    prefix="disease_disease",
+    symmetric=True,
+)
 
-    num_shared = len(disease1_pmids & disease2_pmids)
-    comat[i, j] = comat[j, i] = num_shared
-
-# store disease-disease co-occurrence matrix
-comat = pd.DataFrame(comat, index=mesh_ids, columns=mesh_ids)
-comat.reset_index().rename(columns={"index": "mesh_id"}).to_feather(snek.output[0])
+print(f"Saved disease-disease co-occurrence matrices to {output_dir}")

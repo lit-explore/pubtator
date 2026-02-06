@@ -8,6 +8,7 @@ dependencies = [
     "biothings-client>=0.4.1",
     "pandas>=3.0.0",
     "pyarrow>=23.0.0",
+    "scipy>=1.17.0",
     "snakemake>=9.16.2",
 ]
 

@@ -1,44 +1,47 @@
 """
-Creates a gene-disease co-occurrence matrix
+Creates a gene-disease co-occurrence matrix using sparse matrix multiplication.
+
+Outputs:
+    - gene_disease_counts.npz: Raw co-occurrence counts
+    - gene_disease_dice.npz: Dice coefficient scores
+    - gene_disease_npmi.npz: NPMI scores
+    - gene_disease_labels.json: Row (gene) and column (disease) labels
 """
 
-import json
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from sparse_utils import (
+    build_cross_cooccurrence,
+    compute_cross_scores,
+    load_pmid_mapping,
+    save_cross_cooccurrence_matrices,
+)
 
 snek = snakemake
 
 # load gene and disease pmid mappings
-with open(snek.input[0]) as fp:
-    gene_pmid_mapping = json.load(fp)
+gene_pmids = load_pmid_mapping(snek.input[0])
+disease_pmids = load_pmid_mapping(snek.input[1])
 
-with open(snek.input[1]) as fp:
-    disease_pmid_mapping = json.load(fp)
+print(f"Building co-occurrence matrix for {len(gene_pmids)} genes x {len(disease_pmids)} diseases...")
 
-# pre-convert to sets for faster intersection operations
-gene_pmid_sets = {k: set(v) for k, v in gene_pmid_mapping.items()}
-disease_pmid_sets = {k: set(v) for k, v in disease_pmid_mapping.items()}
+# build co-occurrence matrix via sparse multiplication
+comat, gene_ids, disease_ids, total_docs = build_cross_cooccurrence(gene_pmids, disease_pmids)
 
-# create empty matrix to store gene-disease co-occurrence counts
-entrez_ids = list(gene_pmid_sets.keys())
-num_genes = len(entrez_ids)
+print(f"Computing normalized scores (Dice, NPMI)...")
 
-mesh_ids = list(disease_pmid_sets.keys())
-num_diseases = len(mesh_ids)
+# compute normalized scores
+scores = compute_cross_scores(comat, gene_pmids, disease_pmids, total_docs)
 
-comat = np.zeros((num_genes, num_diseases), dtype=np.uint32)
+# save all matrices
+output_dir = Path(snek.output[0]).parent
+prefix = getattr(snek.params, "prefix", "gene_disease")
+save_cross_cooccurrence_matrices(
+    scores=scores,
+    row_labels=gene_ids,
+    col_labels=disease_ids,
+    output_dir=output_dir,
+    prefix=prefix,
+)
 
-print(f"Computing {num_genes} x {num_diseases} co-occurrence matrix...")
-
-# iterate over genes & diseases
-for i, gene in enumerate(entrez_ids):
-    gene_pmids = gene_pmid_sets[gene]
-
-    for j, disease in enumerate(mesh_ids):
-        disease_pmids = disease_pmid_sets[disease]
-        comat[i, j] = len(gene_pmids & disease_pmids)
-
-# store gene-disease co-occurrence matrix
-comat = pd.DataFrame(comat, index=entrez_ids, columns=mesh_ids)
-comat.reset_index().rename(columns={"index": "entrez_id"}).to_feather(snek.output[0])
+print(f"Saved {prefix} co-occurrence matrices to {output_dir}")
