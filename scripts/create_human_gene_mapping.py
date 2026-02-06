@@ -1,7 +1,9 @@
 """
 Use Biothings API to construct a between human gene id types
 """
-from typing import Any,List
+
+from typing import Any, List
+
 import pandas as pd
 from biothings_client import get_client
 
@@ -13,13 +15,15 @@ mg = get_client("gene")
 with open(snek.input[0], "rt", encoding="utf-8") as fp:
     input_ids = [x.strip() for x in fp.readlines()]
 
-def chunks(lst:List[Any], num_chunks:int):
+
+def chunks(lst: List[Any], num_chunks: int):
     """
     split ids into batches
     https://stackoverflow.com/a/312464/554531
     """
     for j in range(0, len(lst), num_chunks):
-        yield lst[j:j + num_chunks]
+        yield lst[j : j + num_chunks]
+
 
 batches = list(chunks(input_ids, 100))
 
@@ -35,18 +39,19 @@ else:
 for i, batch in enumerate(batches):
     print(f"Querying Biothings ({i + 1}/{len(batches)})")
 
-    mapping = mg.querymany(batch, scopes=scopes,
-                           species=9606, fields="entrezgene", as_dataframe=True)
+    mapping = mg.querymany(
+        batch, scopes=scopes, species=9606, fields="entrezgene", as_dataframe=True
+    )
 
     try:
         mapping = mapping[~mapping.entrezgene.isna()]
         res.append(mapping)
-    except:
-        print(f"mapping failed for batch {i}:")
+    except Exception as e:
+        print(f"mapping failed for batch {i}: {e}")
         print(batch)
 
 # drop unneeded columns
-df = pd.concat([x['entrezgene'] for x in res]).to_frame()
+df = pd.concat([x["entrezgene"] for x in res]).to_frame()
 
 df = df.reset_index().rename(columns={"query": colname})
 

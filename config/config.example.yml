@@ -3,18 +3,23 @@
 #
 
 # where to store raw & processed data
-output_dir: "/data/pubtator"
+output_dir: "/data/pubtator/2026-01-16"
 
 filtering:
   # maximum number of entries allow for a single article; in some cases, a single article may be
   # assoicated with >100k annotations in PubTator, indicating a likely issue with the upstream data
   # generation pipeline;
   # 151 / 26923216 articles are associated with >= 1000 annotations at the time of writing (Dec 2022)
-  pmid_max_entries: 1000
+  pmid_max_entries: 500
 
   # minimum number of occurrences requires for a given mention to be kept
-  mentions_min_freq: 2
+  mentions_min_freq: 5
 
-  # minimum number of occurrences requires for a given concept id to be kept (after filtering by
+  # minimum number of occurrences required for a given concept id to be kept (after filtering by
   # mentions field)
-  concept_id_min_freq: 2
+  concept_id_min_freq: 10
+
+  # minimum number of occurrences requires for a given chemical concept id to be included in the
+  # chemical-chamical co-occurrence matrix construction;
+  # "100" -> 20605/95672 chemicals (2023-10-24 version)
+  chem_comat_concept_id_min_freq: 100

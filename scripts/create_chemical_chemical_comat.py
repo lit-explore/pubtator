@@ -1,9 +1,11 @@
 """
 Creates a chemical-chemical co-occurrence matrix
 """
+
 import json
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 snek = snakemake
 
@@ -16,17 +18,20 @@ with open(snek.input[0]) as fp:
 # low-citation counts..
 concept_id_min_freq = snek.config["filtering"]["chem_comat_concept_id_min_freq"]
 
-chemical_pmids = {}
-
-for mesh_id in unfiltered_chemical_pmids:
-    if len(unfiltered_chemical_pmids[mesh_id]) > concept_id_min_freq:
-        chemical_pmids[mesh_id] = unfiltered_chemical_pmids[mesh_id]
+# pre-convert to sets and filter in one pass
+chemical_pmid_sets = {
+    mesh_id: set(pmids)
+    for mesh_id, pmids in unfiltered_chemical_pmids.items()
+    if len(pmids) > concept_id_min_freq
+}
 
 # create empty matrix to store chemical-chemical co-occurrence counts
-mesh_ids = list(chemical_pmids.keys())
+mesh_ids = list(chemical_pmid_sets.keys())
 num_chemicals = len(mesh_ids)
 
 comat = np.zeros((num_chemicals, num_chemicals), dtype=np.uint32)
+
+print(f"Computing {num_chemicals} x {num_chemicals} co-occurrence matrix...")
 
 # get upper triangular matrix indices
 ind = np.triu_indices(num_chemicals, k=1)
@@ -36,15 +41,10 @@ for cur_ind in range(len(ind[0])):
     i = ind[0][cur_ind]
     j = ind[1][cur_ind]
 
-    chemical1 = mesh_ids[i]
-    chemical2 = mesh_ids[j]
+    chemical1_pmids = chemical_pmid_sets[mesh_ids[i]]
+    chemical2_pmids = chemical_pmid_sets[mesh_ids[j]]
 
-    chemical1_pmids = chemical_pmids[chemical1]
-    chemical2_pmids = chemical_pmids[chemical2]
-
-    # compute chemical-chemical co-occurrence count
-    num_shared = len(set(chemical1_pmids).intersection(chemical2_pmids))
-
+    num_shared = len(chemical1_pmids & chemical2_pmids)
     comat[i, j] = comat[j, i] = num_shared
 
 # store chemical-chemical co-occurrence matrix

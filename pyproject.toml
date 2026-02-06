@@ -10,3 +10,14 @@ dependencies = [
     "pyarrow>=23.0.0",
     "snakemake>=9.16.2",
 ]
+
+[tool.ruff]
+exclude = [ ".git", ".snakemake", "unused" ]
+
+[tool.ruff.lint]
+ignore = ["F821"]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.37.4",
+]
